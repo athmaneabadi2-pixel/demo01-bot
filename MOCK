@@ -1,0 +1,24 @@
+powershell -NoProfile -Command "@'
+from .llm import _ensure_profile, build_system_prompt, client
+import os
+
+def generate_reply(user_text: str, profile_or_path='profile.json') -> str:
+    profile = _ensure_profile(profile_or_path)
+    system = build_system_prompt(profile)
+
+    # Mode MOCK si pas de vraie clé (ou si LLM_MOCK=1)
+    k = os.getenv('OPENAI_API_KEY', '')
+    if os.getenv('LLM_MOCK') == '1' or (not k) or k.startswith('sk-PLACE'):
+        name = profile.get('name', 'Companion')
+        return f\"[MOCK] {name}: {user_text}\"
+
+    # Sinon, appel réel OpenAI (prod)
+    rsp = client().chat.completions.create(
+        model='gpt-4o-mini',
+        messages=[
+            {'role': 'system', 'content': system},
+            {'role': 'user', 'content': user_text},
+        ],
+    )
+    return rsp.choices[0].message.content
+'@ | Set-Content -Encoding UTF8 core\llm_wrap.py"
